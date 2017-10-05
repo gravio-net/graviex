@@ -12,6 +12,9 @@
 # Ignore the default SQLite database.
 /db/*.sqlite3
 
+# Ignore uploaded files
+/public/uploads
+
 # Ignore all logfiles and tempfiles.
 log
 tmp
@@ -23,15 +26,18 @@ tmp
 /config/currencies.yml
 /config/markets.yml
 /config/amqp.yml
+/config/banks.yml
 
 # Ignore translations.js
 /public/javascripts/translations.js
 
 # Ignore ctags
 .tags
+tags
 
 # Ignore vim temporary files
 **/*.swp
+**/*.swo
 
 # Ignore RubyMine files
 .idea
@@ -39,3 +45,5 @@ tmp
 /vendor/bundle
 .env
 .ruby-version
+.DS_Store
+.agignore

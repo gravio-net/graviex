@@ -29,7 +29,7 @@ describe Trade, ".collect_side" do
   end
 
   it "should sort trades in reverse creation order" do
-    Trade.for_member(ask.currency, member).first.should == trades.last
+    Trade.for_member(ask.currency, member, order: 'id desc').first.should == trades.last
   end
 
   it "should return 1 trade" do
@@ -38,9 +38,9 @@ describe Trade, ".collect_side" do
   end
 
   it "should return trades from specified time" do
-    results = Trade.for_member(ask.currency, member, from: 1.day.ago)
+    results = Trade.for_member(ask.currency, member, time_to: 30.hours.ago)
     results.should have(1).trade
-    results.first.should == trades.last
+    results.first.should == trades.first
   end
 end
 

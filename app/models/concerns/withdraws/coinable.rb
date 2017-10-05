@@ -2,25 +2,36 @@ module Withdraws
   module Coinable
     extend ActiveSupport::Concern
 
-    included do
-      validate :validate_address
-    end
-
     def set_fee
       self.fee = "0.0001".to_d
     end
 
-    private
+    def blockchain_url
+      currency_obj.blockchain_url(txid)
+    end
 
-    def validate_address
+    def audit!
       result = CoinRPC[currency].validateaddress(fund_uid)
 
-      if result[:isvalid] == false
-        errors.add(:fund_uid, :invalid)
+      if result.nil? || (result[:isvalid] == false)
+        Rails.logger.info "#{self.class.name}##{id} uses invalid address: #{fund_uid.inspect}"
+        reject
+        save!
       elsif (result[:ismine] == true) || PaymentAddress.find_by_address(fund_uid)
-        errors.add(:fund_uid, :ismine)
+        Rails.logger.info "#{self.class.name}##{id} uses hot wallet address: #{fund_uid.inspect}"
+        reject
+        save!
+      else
+        super
       end
     end
+
+    def as_json(options={})
+      super(options).merge({
+        blockchain_url: blockchain_url
+      })
+    end
+
   end
 end
 

@@ -1,8 +1,7 @@
-class Bank < ActiveYaml::Base
-  set_root_path "#{Rails.root}/config"
-  set_filename "banks"
+class Bank < ActiveYamlBase
+  include HashCurrencible
 
-  def self.fetch
-    all.reduce({}){|memo, bank| memo[bank.code] = bank.name; memo}
+  def self.with_currency(c)
+    find_all_by_currency c.to_s
   end
 end

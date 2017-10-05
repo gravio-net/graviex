@@ -9,9 +9,15 @@ class FundSource < ActiveRecord::Base
 
   validates_presence_of :uid, :extra, :member
 
-  scope :with_channel, -> (channel_id) { where channel_id: channel_id }
+  def label
+    if currency_obj.try :coin?
+      "#{uid} (#{extra})"
+    else
+      [I18n.t("banks.#{extra}"), "****#{uid[-4..-1]}"].join('#')
+    end
+  end
 
-  def to_s
-    "#{uid} @ #{extra}"
+  def as_json(options = {})
+    super(options).merge({label: label})
   end
 end

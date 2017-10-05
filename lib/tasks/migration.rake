@@ -16,55 +16,6 @@ namespace :migration do
     end
   end
 
-  desc "migrate fund sources"
-  task build_fund_sources: :environment do
-    if ActiveRecord::Migrator.current_version == 20140324060148
-      puts "BEGIN ------------------------------------------"
-      FundSource.with_deleted.all.each do |f|
-        suppress(Exception) do
-          a = Account.find(f.account_id)
-          f.update_columns(member_id: a.member_id, currency: a.currency_value)
-        end
-      end
-      puts "END --------------------------------------------"
-    end
-  end
-
-  desc "Change bank name in withdraws and fund_sources to bank code"
-  task convert_to_bank_code: :environment do
-    banks = {
-      "icbc"=>"工商银行",
-      "cbc"=>"中国建设银行",
-      "bc"=>"中国银行",
-      "bcm"=>"交通银行",
-      "abc"=>"中国农业银行",
-      "cmb"=>"招商银行",
-      "cmbc"=>"民生银行",
-      "cncb"=>"中信银行",
-      "hxb"=>"华夏银行",
-      "cib"=>"兴业银行",
-      "spdb"=>"上海浦东发展银行",
-      "bob"=>"北京银行",
-      "ceb"=>"中国光大银行",
-      "sdb"=>"深圳发展银行",
-      "gdb"=>"广东发展银行"}.invert
-
-      Withdraws::Bank.class_eval do
-        def fund_extra
-          results = ActiveRecord::Base.connection.exec_query "select fund_extra from #{self.class.table_name} where id = #{id}"
-          results[0].try(:[], 'fund_extra')
-        end
-      end
-
-      FundSource.all.each do |record|
-        record.update_column :extra, banks[record.extra] if banks[record.extra]
-      end
-
-      Withdraws::Bank.all.each do |record|
-        record.update_column :fund_extra, banks[record.fund_extra] if banks[record.fund_extra]
-      end
-  end
-
   desc "update ask_member_id and bid_member_id of trades"
   task update_ask_member_id_and_bid_member_id_of_trades: :environment do
     Trade.find_each do |trade|
@@ -73,4 +24,83 @@ namespace :migration do
         bid_member_id: trade.bid.try(:member_id)
     end
   end
+
+  desc "set history orders ord_type to limit"
+  task fix_orders_without_ord_type_and_locked: :environment do
+    Order.find_each do |order|
+      if order.ord_type.blank?
+        order.ord_type = 'limit'
+      end
+
+      if order.ord_type == 'limit'
+        order.origin_locked = order.price*order.origin_volume
+        order.locked = order.compute_locked
+      end
+
+      order.save! if order.changed?
+    end
+  end
+
+  desc "fill funds_received of history orders"
+  task fill_funds_received: :environment do
+    OrderBid.where(funds_received: 0).update_all('funds_received = origin_volume - volume')
+
+    total = OrderAsk.where(funds_received: 0).count
+    count = 0
+    OrderAsk.where(funds_received: 0).find_each do |order|
+      count += 1
+      funds = order.trades.sum(:funds)
+      order.update_columns funds_received: funds if funds > ::Trade::ZERO
+      puts "[#{count}/#{total}] filled #{funds} for ask##{order.id}"
+    end
+  end
+
+  desc "reset aasm_state of id_documents"
+  task reset_aasm_state_of_id_documents: :environment do
+    IdDocument.find_each do |id_doc|
+      if id_doc.verified
+        id_doc.update aasm_state: 'verified'
+      else
+        id_doc.update aasm_state: 'unverified'
+      end
+    end
+  end
+
+  desc "upgrade to new deposit-transaction schema"
+  task new_deposit_transaction_schema: :environment do
+    PaymentTransaction.where(type: nil).update_all(type: 'PaymentTransaction::Normal')
+    PaymentTransaction.where(type: 'PaymentTransaction::Default').update_all(type: 'PaymentTransaction::Normal')
+
+    PaymentTransaction::Normal.find_each do |pt|
+      pt.update_attributes txout: 0
+    end
+
+    Deposit.find_each do |deposit|
+      if deposit.payment_transaction_id.nil?
+        pt = PaymentTransaction.find_by_txid deposit.txid
+        deposit.update_attributes(payment_transaction_id: pt.id, txout: pt.txout) if pt
+      end
+    end
+  end
+
+  desc "fix scopes of old api tokens"
+  task fix_scopes: :environment do
+    puts APIToken.where(scopes: nil).update_all(scopes: 'all')
+  end
+
+  desc "fix order trades_count"
+  task fix_trades_count: :environment do
+    orders = Order.where('origin_volume != volume AND trades_count = 0')
+    total = orders.count
+    count = 0
+
+    puts "Found #{total} matched orders, start processing:"
+    orders.find_each do |order|
+      count += 1
+      print "#{count}/#{total} processing Order##{order.id} ..."
+      order.update_column :trades_count, order.trades.count
+      puts " #{order.trades_count} trades."
+    end
+  end
+
 end

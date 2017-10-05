@@ -7,19 +7,24 @@ module Admin
 
       can :read, Order
       can :read, Trade
-      can :read, Member
-      can :update, Member
+      can :read, Proof
+      can :update, Proof
       can :manage, Document
+      can :manage, Member
+      can :manage, Ticket
+      can :manage, IdDocument
+      can :manage, TwoFactor
 
       can :menu, Deposit
       can :manage, ::Deposits::Bank
       can :manage, ::Deposits::Satoshi
+      can :manage, ::Deposits::Ether
 
       can :menu, Withdraw
       can :manage, ::Withdraws::Bank
       can :manage, ::Withdraws::Satoshi
+      can :manage, ::Withdraws::Ether
 
-      can :stat, ::Member
     end
   end
 end

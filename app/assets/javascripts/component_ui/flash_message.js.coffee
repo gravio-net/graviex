@@ -1,11 +1,8 @@
 @FlashMessageUI = flight.component ->
 
-  @defaultAttrs
-    template: 'flash_message'
-
   @showMeg = (data) ->
     @$node.html("")
-    template = JST[@attr.template](data)
+    template = JST['templates/flash_message'](data)
     $(template).prependTo(@$node)
 
   @info = (event, data) ->
@@ -21,7 +18,6 @@
     @showMeg(data)
 
   @after 'initialize', ->
-    @on document, 'flash-info', @info
-    @on document, 'flash-notice', @notice
-    @on document, 'flash-alert', @alert
-
+    @on document, 'flash:info', @info
+    @on document, 'flash:notice', @notice
+    @on document, 'flash:alert', @alert

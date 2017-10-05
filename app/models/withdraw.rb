@@ -1,6 +1,6 @@
 class Withdraw < ActiveRecord::Base
   STATES = [:submitting, :submitted, :rejected, :accepted, :suspect, :processing,
-            :coin_ready, :coin_done, :done, :canceled, :almost_done, :failed]
+            :done, :canceled, :almost_done, :failed]
   COMPLETED_STATES = [:done, :rejected, :canceled, :almost_done, :failed]
 
   extend Enumerize
@@ -8,8 +8,6 @@ class Withdraw < ActiveRecord::Base
   include AASM
   include AASM::Locking
   include Currencible
-
-  attr_accessor :save_fund_source
 
   has_paper_trail on: [:update, :destroy]
 
@@ -23,13 +21,18 @@ class Withdraw < ActiveRecord::Base
   delegate :key_text, to: :channel, prefix: true
   delegate :id, to: :channel, prefix: true
   delegate :name, to: :member, prefix: true
-  delegate :coin?, to: :currency_obj
+  delegate :coin?, :fiat?, to: :currency_obj
 
+  before_validation :fix_precision
   before_validation :calc_fee
   before_validation :set_account
-  after_create :create_fund_source, if: :save_fund_source?
   after_create :generate_sn
-  after_update :bust_last_done_cache, if: :state_changed_to_done
+
+  after_update :sync_update
+  after_create :sync_create
+  after_destroy :sync_destroy
+
+  validates_with WithdrawBlacklistValidator
 
   validates :fund_uid, :amount, :fee, :account, :currency, :member, presence: true
 
@@ -56,22 +59,6 @@ class Withdraw < ActiveRecord::Base
     channel.key
   end
 
-  def fiat?
-    !coin?
-  end
-
-  def audit
-    AMQPQueue.enqueue(:withdraw_audit, id: id) if submitted?
-  end
-
-  def position_in_queue
-    last_done = Rails.cache.fetch(last_completed_withdraw_cache_key) do
-      self.class.completed.maximum(:id)
-    end
-
-    self.class.where("id > ? AND id <= ?", (last_done || 0), id).count
-  end
-
   alias_attribute :withdraw_id, :sn
   alias_attribute :full_name, :member_name
 
@@ -83,16 +70,16 @@ class Withdraw < ActiveRecord::Base
   end
 
   aasm :whiny_transitions => false do
-    state :submitting, initial: true
-    state :submitted, after_commit: :audit
-    state :canceled, after_commit: :send_email
+    state :submitting,  initial: true
+    state :submitted,   after_commit: :send_email
+    state :canceled,    after_commit: [:send_email]
     state :accepted
-    state :suspect, after_commit: :send_email
-    state :rejected, after_commit: :send_email
-    state :processing, after_commit: :send_coins!
+    state :suspect,     after_commit: :send_email
+    state :rejected,    after_commit: :send_email
+    state :processing,  after_commit: [:send_coins!, :send_email]
     state :almost_done
-    state :done, after_commit: :send_email
-    state :failed, after_commit: :send_email
+    state :done,        after_commit: [:send_email, :send_sms]
+    state :failed,      after_commit: :send_email
 
     event :submit do
       transitions from: :submitting, to: :submitted
@@ -103,8 +90,8 @@ class Withdraw < ActiveRecord::Base
 
     event :cancel do
       transitions from: [:submitting, :submitted, :accepted], to: :canceled
-      before do
-        unlock_funds unless submitting?
+      after do
+        after_cancel
       end
     end
 
@@ -117,7 +104,7 @@ class Withdraw < ActiveRecord::Base
     end
 
     event :reject do
-      transitions from: [:accepted, :processing], to: :rejected
+      transitions from: [:submitted, :accepted, :processing], to: :rejected
       after :unlock_funds
     end
 
@@ -144,7 +131,28 @@ class Withdraw < ActiveRecord::Base
     submitting? or submitted? or accepted?
   end
 
+  def quick?
+    sum <= currency_obj.quick_withdraw_max
+  end
+
+  def audit!
+    with_lock do
+      if account.examine
+        accept
+        process if quick?
+      else
+        mark_suspect
+      end
+
+      save!
+    end
+  end
+
   private
+
+  def after_cancel
+    unlock_funds unless aasm.from_state == :submitting
+  end
 
   def lock_funds
     account.lock!
@@ -166,20 +174,43 @@ class Withdraw < ActiveRecord::Base
   end
 
   def send_email
-    WithdrawMailer.withdraw_state(self.id).deliver
+    case aasm_state
+    when 'submitted'
+      WithdrawMailer.submitted(self.id).deliver
+    when 'processing'
+      WithdrawMailer.processing(self.id).deliver
+    when 'done'
+      WithdrawMailer.done(self.id).deliver
+    else
+      WithdrawMailer.withdraw_state(self.id).deliver
+    end
+  end
+
+  def send_sms
+    return true if not member.sms_two_factor.activated?
+
+    sms_message = I18n.t('sms.withdraw_done', email: member.email,
+                                              currency: currency_text,
+                                              time: I18n.l(Time.now),
+                                              amount: amount,
+                                              balance: account.balance)
+
+    AMQPQueue.enqueue(:sms_notification, phone: member.phone_number, message: sms_message)
   end
 
   def send_coins!
     AMQPQueue.enqueue(:withdraw_coin, id: id) if coin?
   end
 
-  def last_completed_withdraw_cache_key
-    "last_completed_withdraw_id_for_#{channel.key}"
-  end
-
   def ensure_account_balance
     if sum.nil? or sum > account.balance
-      errors.add(:sum, :poor)
+      errors.add :base, -> { I18n.t('activerecord.errors.models.withdraw.account_balance_is_poor') }
+    end
+  end
+
+  def fix_precision
+    if sum && currency_obj.precision
+      self.sum = sum.round(currency_obj.precision, BigDecimal::ROUND_DOWN)
     end
   end
 
@@ -197,28 +228,21 @@ class Withdraw < ActiveRecord::Base
     self.account = member.get_account(currency)
   end
 
-  def state_changed_to_done
-    aasm_state_changed? && COMPLETED_STATES.include?(aasm_state.to_sym)
-  end
-
-  def bust_last_done_cache
-    Rails.cache.delete(last_completed_withdraw_cache_key)
-  end
-
-  def save_fund_source?
-    [true, 'true', '1', 1].include? @save_fund_source
-  end
-
-  def create_fund_source
-    FundSource.find_or_create_by \
-      member: member,
-      currency: currency_value,
-      channel_id: channel.id,
-      uid: fund_uid,
-      extra: fund_extra
-  end
-
   def self.resource_name
     name.demodulize.underscore.pluralize
   end
+
+  def sync_update
+    ::Pusher["private-#{member.sn}"].trigger_async('withdraws', { type: 'update', id: self.id, attributes: self.changes_attributes_as_json })
+  end
+
+  def sync_create
+    ::Pusher["private-#{member.sn}"].trigger_async('withdraws', { type: 'create', attributes: self.as_json })
+  end
+
+  def sync_destroy
+    ::Pusher["private-#{member.sn}"].trigger_async('withdraws', { type: 'destroy', id: self.id })
+  end
+
+
 end

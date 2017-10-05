@@ -4,10 +4,10 @@ module Admin
       load_and_authorize_resource :class => '::Deposits::Satoshi'
 
       def index
-        start_at = DateTime.now.ago(60 * 60 * 24)
+        start_at = DateTime.now.ago(60 * 60 * 24 * 365)
         @satoshis = @satoshis.includes(:member).
           where('created_at > ?', start_at).
-          order('id DESC')
+          order('id DESC').page(params[:page]).per(20)
       end
 
       def update

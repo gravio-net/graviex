@@ -29,14 +29,33 @@ describe APIv2::Trades do
       JSON.parse(response.body).should have(1).trade
     end
 
-    it "should return trades after timestamp" do
-      get '/api/v2/trades', market: 'btccny', timestamp: 30.hours.ago.to_i
+    it "should return trades before timestamp" do
+      another = create(:trade, bid: bid, created_at: 6.hours.ago)
+      get '/api/v2/trades', market: 'btccny', timestamp: 8.hours.ago.to_i, limit: 1
       response.should be_success
-      JSON.parse(response.body).should have(1).trade
+      json = JSON.parse(response.body)
+      json.should have(1).trade
+      json.first['id'].should == bid_trade.id
+    end
+
+    it "should return trades between id range" do
+      another = create(:trade, bid: bid)
+      get '/api/v2/trades', market: 'btccny', from: ask_trade.id, to: another.id
+      response.should be_success
+      json = JSON.parse(response.body)
+      json.should have(1).trade
+      json.first['id'].should == bid_trade.id
     end
 
     it "should sort trades in reverse creation order" do
       get '/api/v2/trades', market: 'btccny'
+      response.should be_success
+      JSON.parse(response.body).first['id'].should == bid_trade.id
+    end
+
+    it "should get trades by from and limit" do
+      another = create(:trade, bid: bid, created_at: 6.hours.ago)
+      get '/api/v2/trades', market: 'btccny', from: ask_trade.id, limit: 1, order_by: 'asc'
       response.should be_success
       JSON.parse(response.body).first['id'].should == bid_trade.id
     end
@@ -46,7 +65,7 @@ describe APIv2::Trades do
     it "should require authentication" do
       get '/api/v2/trades/my', market: 'btccny', access_key: 'test', tonce: time_to_milliseconds, signature: 'test'
       response.code.should == '401'
-      response.body.should == '{"error":{"code":2001,"message":"Authorization failed"}}'
+      response.body.should == '{"error":{"code":2008,"message":"The access key test does not exist."}}'
     end
 
     it "should return all my recent trades" do
@@ -55,7 +74,9 @@ describe APIv2::Trades do
 
       result = JSON.parse(response.body)
       result.find {|t| t['id'] == ask_trade.id }['side'].should == 'ask'
+      result.find {|t| t['id'] == ask_trade.id }['order_id'].should == ask.id
       result.find {|t| t['id'] == bid_trade.id }['side'].should == 'bid'
+      result.find {|t| t['id'] == bid_trade.id }['order_id'].should == bid.id
     end
 
     it "should return 1 trade" do
@@ -64,7 +85,7 @@ describe APIv2::Trades do
       JSON.parse(response.body).should have(1).trade
     end
 
-    it "should return trades after timestamp" do
+    it "should return trades before timestamp" do
       signed_get '/api/v2/trades/my', params: {market: 'btccny', timestamp: 30.hours.ago.to_i}, token: token
       response.should be_success
       JSON.parse(response.body).should have(1).trade

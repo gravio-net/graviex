@@ -1,15 +1,16 @@
 module Private
   class AssetsController < BaseController
-    layout 'application', only: [:index]
-
-    before_action :auth_activated!
+    skip_before_action :auth_member!, only: [:index]
 
     def index
       @cny_assets  = Currency.assets('cny')
-      @btc_proof   = select_proof :btc
-      @cny_proof   = select_proof :cny
-      @btc_account = current_user.accounts.with_currency(:btc).first
-      @cny_account = current_user.accounts.with_currency(:cny).first
+      @btc_proof   = Proof.current :btc
+      @cny_proof   = Proof.current :cny
+
+      if current_user
+        @btc_account = current_user.accounts.with_currency(:btc).first
+        @cny_account = current_user.accounts.with_currency(:cny).first
+      end
     end
 
     def partial_tree
@@ -19,13 +20,6 @@ module Private
       respond_to do |format|
         format.js
       end
-    end
-
-    private
-
-    def select_proof(code)
-      scope = Proof.with_currency(code)
-      scope.where('created_at <= ?', 1.day.ago).last || scope.last
     end
 
   end

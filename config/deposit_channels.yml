@@ -8,4 +8,14 @@
   key: bank
   currency: cny
   sort_order: 2
-  banks: ["icbc", "cbc", "bc", "bcm", "abc", "cmb", "cmbc", "cncb", "hxb", "cib", "spdb", "bob", "cncb", "ceb", "sdb", "pab", "gdb"]
+  bank_accounts:
+    -
+      bank: 'Your Bank Name'
+      branch: 'Your Bank Branch'
+      holder: 'Your Account Holder'
+      account: 'Your Account Number'
+- id: 600
+  key: ether
+  currency: eth
+  min_confirm: 1
+  max_confirm: 6

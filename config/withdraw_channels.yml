@@ -15,5 +15,14 @@
   fee: 0.003
   proportion: true
   inuse: true
-  banks: ["icbc", "cbc", "bc", "bcm", "abc", "cmb", "cmbc", "cncb", "hxb", "cib", "spdb", "bob", "cncb", "ceb", "sdb", "pab", "gdb"]
   type: WithdrawChannelBank
+- id: 500
+  key: ether
+  currency: eth
+  min_confirm: 1
+  max_confirm: 6
+  inuse: true
+  fixed: 8
+  fee: 0.0005
+  type: WithdrawChannelEthereum
+  

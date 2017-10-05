@@ -3,8 +3,9 @@ module Deposits
     extend ActiveSupport::Concern
 
     included do
-      validates_uniqueness_of :txid
-      belongs_to :payment_transaction, foreign_key: 'txid', primary_key: 'txid'
+      validates_presence_of :payment_transaction_id
+      validates_uniqueness_of :payment_transaction_id
+      belongs_to :payment_transaction
     end
 
     def channel
@@ -22,13 +23,21 @@ module Deposits
     end
 
     def update_confirmations(confirmations)
-      if !self.new_record? && self.memo.to_s != confirmations.to_s
-        self.update_attribute(:memo, confirmations.to_s)
+      if !self.new_record? && self.confirmations.to_s != confirmations.to_s
+        self.update_attribute(:confirmations, confirmations.to_s)
       end
     end
 
     def blockchain_url
       currency_obj.blockchain_url(txid)
+    end
+
+    def as_json(options = {})
+      super(options).merge({
+        txid: txid.blank? ? "" : txid[0..29],
+        confirmations: payment_transaction.nil? ? 0 : payment_transaction.confirmations,
+        blockchain_url: blockchain_url
+      })
     end
   end
 end

@@ -14,11 +14,14 @@ Dir[Rails.root.join("spec/support/**/*.rb")].each { |f| require f }
 # If you are not using ActiveRecord, you can remove this line.
 ActiveRecord::Migration.check_pending! if defined?(ActiveRecord::Migration)
 
-I18n.locale = :en
-
 Capybara.register_driver :poltergeist do |app|
-  options = {:js_errors => false, :debug => false, :logger => nil, :phantomjs_logger => nil}
-  Capybara::Poltergeist::Driver.new(app, options)
+  Capybara::Poltergeist::Driver.new(app, {
+    js_errors: false,
+    debug: false,
+    logger: nil,
+    phantomjs_logger: nil,
+    window_size: [1440, 900]
+  })
 end
 
 Capybara.javascript_driver = :poltergeist
@@ -54,15 +57,17 @@ RSpec.configure do |config|
   config.include FactoryGirl::Syntax::Methods
 
   config.before(:suite) do
-    DatabaseCleaner.clean_with :truncation
+    DatabaseCleaner.strategy = :deletion
   end
 
   config.before(:each) do
-    DatabaseCleaner.strategy = :truncation
     DatabaseCleaner.start
 
     Rails.cache.clear
     AMQPQueue.stubs(:publish)
+    KlineDB.stubs(:kline).returns([])
+
+    I18n.locale = :en
   end
 
   config.after(:each) do

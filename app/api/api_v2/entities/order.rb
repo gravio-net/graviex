@@ -4,6 +4,7 @@ module APIv2
       expose :id, documentation: "Unique order id."
 
       expose :side, documentation: "Either 'sell' or 'buy'."
+      expose :ord_type, documentation: "Type of order, either 'limit' or 'market'."
 
       expose :price, documentation: "Price for each unit. e.g. If you want to sell/buy 1 btc at 3000 CNY, the price is '3000.0'"
 
@@ -23,6 +24,7 @@ module APIv2
         order.origin_volume - order.volume
       end
 
+      expose :trades_count
       expose :trades, if: {type: :full} do |order, options|
         ::APIv2::Entities::Trade.represent order.trades, side: side
       end

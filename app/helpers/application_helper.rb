@@ -41,46 +41,16 @@ module ApplicationHelper
     end
   end
 
-  def breadcrumbs
-    content_tag 'ol', class: 'breadcrumb' do
-      breadcrumb(controller_path.split('/'), []).reverse.join.html_safe
-    end
-  end
-
-  def breadcrumb(paths, result)
-    return result if paths.empty?
-    r = content_tag :li, class: "#{result.empty? ? 'active' : nil}" do
-      if result.empty?
-        I18n.t("breadcrumbs.#{paths.join('/')}", default: 'DEFAULT')
-      else
-        content_tag :a, href: '#' do
-          I18n.t("breadcrumbs.#{paths.join('/')}", default: 'DEFAULT')
-        end
-      end
-    end
-    paths.pop
-    breadcrumb(paths, result << r)
-  end
-
-  def blockchain_url(txid)
-    "https://blockchain.info/tx/#{txid}"
-  end
-
-  def qr_tag(data)
-    data = QREncoder.encode(data).png.resize(272, 272).to_data_url
-    image_tag(data, :class => 'qrcode img-thumbnail')
+  def qr_tag(text)
+    return if text.blank?
+    content_tag :div, '', 'class'       => 'qrcode-container img-thumbnail',
+                          'data-width'  => 272,
+                          'data-height' => 272,
+                          'data-text'   => text
   end
 
   def rev_category(type)
     type.to_sym == :bid ? :ask : :bid
-  end
-
-  def currency_icon(type)
-    t("currency.icon.#{type}")
-  end
-
-  def currency_format(type)
-    t("currency.format.#{type}")
   end
 
   def orders_json(orders)
@@ -98,17 +68,6 @@ module ApplicationHelper
     end
   end
 
-  def link_to_block(payment_address)
-    uri = case payment_address.currency
-    when 'btc' then btc_block_url(payment_address.address)
-    end
-    link_to t("actions.block"), uri, target: '_blank'
-  end
-
-  def btc_block_url(address)
-    CoinRPC[:btc].getinfo[:testnet] ? "http://testnet.btclook.com/addr/#{address}" : "https://blockchain.info/address/#{address}"
-  end
-
   def top_nav(link_text, link_path, link_icon, links = nil, controllers: [])
     if links && links.length > 1
       top_dropdown_nav(link_text, link_path, link_icon, links, controllers: controllers)
@@ -117,13 +76,26 @@ module ApplicationHelper
     end
   end
 
-  def top_nav_link(link_text, link_path, link_icon, controllers: [])
-    class_name = current_page?(link_path) ? 'active' : nil
-    class_name ||= (controllers & controller_path.split('/')).empty? ? nil : 'active'
+  def top_market_link(market, current_market)
+    class_name = ((market.id == current_market.id) ? 'active' : nil)
 
     content_tag(:li, :class => class_name) do
-      link_to link_path do
-        content_tag(:i, :class => "fa fa-#{link_icon}") do end +
+      link_to market_path(market.id)  do
+        content_tag(:span, market.name)
+      end
+    end
+  end
+
+  def top_nav_link(link_text, link_path, link_icon, controllers: [], counter: 0, target: '')
+    merged = (controllers & controller_path.split('/'))
+    class_name = current_page?(link_path) ? 'active' : nil
+    class_name ||= merged.empty? ? nil : 'active'
+
+    content_tag(:li, :class => class_name) do
+      link_to link_path, target: target do
+        content_tag(:i, :class => "fa fa-#{link_icon}") do
+          content_tag(:span, counter,class: "counter") if counter != 0
+        end +
         content_tag(:span, link_text)
       end
     end
@@ -147,15 +119,16 @@ module ApplicationHelper
     end
   end
 
-  def market_links
-    @market_links ||= Market.all.collect{|m| [m.name, market_path(m.id)]}
+  def history_links
+    [ [t('header.order_history'), order_history_path],
+      [t('header.trade_history'), trade_history_path],
+      [t('header.account_history'), account_history_path] ]
   end
-
 
   def simple_vertical_form_for(record, options={}, &block)
     result = simple_form_for(record, options, &block)
-    result = result.gsub(/#{SimpleForm.form_class}/, "simple_form").html_safe
-    result.gsub(/col-sm-\d/, "").html_safe
+    result = result.gsub(/#{SimpleForm.default_form_class}/, "simple_form").html_safe
+    result.gsub(/col-xs-\d/, "").html_safe
   end
 
   def panel(name: 'default-panel', key: nil, &block)
@@ -173,6 +146,14 @@ module ApplicationHelper
     end
   end
 
+  def locale_name
+    I18n.locale.to_s.downcase
+  end
+
+  def body_id
+    "#{controller_name}-#{action_name}"
+  end
+
   def balance_panel(member: nil)
     member ||= current_user
     panel name: 'balance-pannel', key: 'guides.panels.balance' do
@@ -181,15 +162,15 @@ module ApplicationHelper
   end
 
   def guide_panel_title
-    t("guides.#{i18n_controller_path}.#{action_name}.panel", default: t("guides.#{i18n_controller_path}.panel"))
+    @guide_panel_title || t("guides.#{i18n_controller_path}.#{action_name}.panel", default: t("guides.#{i18n_controller_path}.panel"))
   end
 
   def guide_title
-    t("guides.#{i18n_controller_path}.#{action_name}.title", default: t("guides.#{i18n_controller_path}.panel"))
+    @guide_title || t("guides.#{i18n_controller_path}.#{action_name}.title", default: t("guides.#{i18n_controller_path}.panel"))
   end
 
   def guide_intro
-    t("guides.#{i18n_controller_path}.#{action_name}.intro", default: t("guides.#{i18n_controller_path}.intro", default: ''))
+    @guide_intro || t("guides.#{i18n_controller_path}.#{action_name}.intro", default: t("guides.#{i18n_controller_path}.intro", default: ''))
   end
 
   def i18n_controller_path
@@ -198,7 +179,7 @@ module ApplicationHelper
 
   def language_path(lang=nil)
     lang ||= I18n.locale
-    asset_path("languages/#{lang}.png")
+    asset_path("/languages/#{lang}.png")
   end
 
   def i18n_meta(key)
@@ -211,7 +192,7 @@ module ApplicationHelper
     end
   end
 
-  def item_for(model_or_title, name, value = nil, &block)
+  def item_for(model_or_title, name='', value = nil, &block)
     if model_or_title.is_a? String or model_or_title.is_a? Symbol
       title = model_or_title
       capture do
@@ -242,19 +223,6 @@ module ApplicationHelper
     end
   end
 
-  def muut_api_options
-    key = ENV['MUUT_KEY']
-    secret = ENV['MUUT_SECRET']
-    ts = Time.now.to_i
-    message = Base64.strict_encode64 ({user: current_user.try(:to_muut) || {}}).to_json
-    signature = Digest::SHA1.hexdigest "#{secret} #{message} #{ts}"
-    { key: key,
-      signature: signature,
-      message: message,
-      timestamp: ts
-    }
-  end
-
   def yesno(val)
     if val
       content_tag(:span, 'YES', class: 'label label-success')
@@ -263,16 +231,19 @@ module ApplicationHelper
     end
   end
 
-  def two_factor_tag(user)
-    app_activated = user.two_factors.by_type(:app).activated?
-    sms_activated = user.two_factors.by_type(:sms).activated?
-
-    if !sms_activated and user.phone_number_verified?
-      user.two_factors.by_type(:sms).active!
-      sms_activated = true
-    end
-
-    locals = {app_activated: app_activated, sms_activated: sms_activated}
-    render partial: 'shared/two_factor_auth', locals: locals
+  def format_currency(number, currency, n: nil)
+    currency_obj = Currency.find_by_code(currency.to_s)
+    digit = n || currency_obj.decimal_digit
+    decimal = (number || 0).to_d.round(0, digit)
+    decimal = number_with_precision(decimal, precision: digit, delimiter: ',')
+    "<span class='decimal'><small>#{currency_obj.symbol}</small>#{decimal}</span>"
   end
+
+  def partial_phone_number(member)
+    number = Phonelib.parse(member.phone_number).national
+    mask = number.gsub(/\d/, '*')
+    "#{number.first(3)}#{mask[3,number.size-7]}#{number.last(4)}"
+  end
+
+  alias_method :d, :format_currency
 end

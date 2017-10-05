@@ -17,8 +17,10 @@ conn = Bunny.new AMQPConfig.connect
 conn.start
 
 ch = conn.create_channel
-ch.prefetch(1)
-logger.info "Connected to AMQP broker."
+id = $0.split(':')[2]
+prefetch = AMQPConfig.channel(id)[:prefetch] || 0
+ch.prefetch(prefetch) if prefetch > 0
+logger.info "Connected to AMQP broker (prefetch: #{prefetch > 0 ? prefetch : 'default'})"
 
 terminate = proc do
   # logger is forbidden in signal handling, just use puts here
@@ -49,24 +51,31 @@ ARGV.each do |id|
     end
   end
 
-  manual_ack = AMQPConfig.data[:binding][id][:manual_ack]
+  clean_start = AMQPConfig.data[:binding][id][:clean_start]
+  queue.purge if clean_start
+
+  manual_ack  = AMQPConfig.data[:binding][id][:manual_ack]
   queue.subscribe(manual_ack: manual_ack) do |delivery_info, metadata, payload|
     logger.info "Received: #{payload}"
     begin
       worker.process JSON.parse(payload), metadata, delivery_info
-      ch.ack(delivery_info.delivery_tag) if manual_ack
     rescue Exception => e
       logger.fatal e
       logger.fatal e.backtrace.join("\n")
+    ensure
+      ch.ack(delivery_info.delivery_tag) if manual_ack
     end
   end
 
   workers << worker
 end
 
-Signal.trap("USR1") do
-  puts "USR1 received."
-  workers.each {|w| w.on_usr1 if w.respond_to?(:on_usr1) }
+%w(USR1 USR2).each do |signal|
+  Signal.trap(signal) do
+    puts "#{signal} received."
+    handler = "on_#{signal.downcase}"
+    workers.each {|w| w.send handler if w.respond_to?(handler) }
+  end
 end
 
 ch.work_pool.join

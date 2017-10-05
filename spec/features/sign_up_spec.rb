@@ -22,7 +22,12 @@ describe 'Sign up', js: true do
     expect(mail.to).to eq([identity.email])
     expect(mail.subject).to eq(I18n.t 'token_mailer.activation.subject')
 
-    mail.body.to_s.match(/http:\/\/peatio\.dev(.*)/)[1]
+    path = "/activations/#{Token::Activation.last.token}/edit"
+    link = "#{ENV['URL_SCHEMA']}://#{ENV['URL_HOST']}#{path}"
+
+    expect(mail.body.to_s).to have_link(link)
+
+    path
   end
 
   it 'allows a user to sign up and activate the account' do
@@ -46,7 +51,7 @@ describe 'Sign up', js: true do
 
     first_activation_link = email_activation_link
 
-    Timecop.travel(6.minutes.from_now)
+    Timecop.travel(31.minutes.from_now)
 
     click_on t('private.settings.index.email.resend')
 

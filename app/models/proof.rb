@@ -5,9 +5,16 @@ class Proof < ActiveRecord::Base
 
   serialize :root, JSON
   serialize :addresses, JSON
+
   validates_presence_of :root, :currency
+  validates_numericality_of :balance, allow_nil: true, greater_than_or_equal_to: 0
 
   delegate :coin?, to: :currency_obj
+
+  def self.current(code)
+    proofs = with_currency(code)
+    proofs.where('created_at <= ?', 1.day.ago).last || proofs.last
+  end
 
   def ready!
     self.ready = true
@@ -26,6 +33,10 @@ class Proof < ActiveRecord::Base
     addresses.reduce 0 do |memo, address|
       memo + address["balance"]
     end
+  end
+
+  def address_url(address)
+    currency_obj.address_url(address)
   end
 
 end

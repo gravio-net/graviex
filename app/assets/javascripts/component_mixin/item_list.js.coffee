@@ -1,17 +1,17 @@
 @ItemListMixin = ->
-  @defaultAttrs
+  @attributes
     tbody: 'table > tbody'
     empty: '.empty-row'
 
   @checkEmpty = (event, data) ->
     if @select('tbody').find('tr.order').length is 0
-      @select('empty').show()
+      @select('empty').fadeIn()
     else
-      @select('empty').hide()
+      @select('empty').fadeOut()
 
   @addOrUpdateItem = (item) ->
     template = @getTemplate(item)
-    existsItem = @select('tbody').find("tr[data-id=#{item.id}]")
+    existsItem = @select('tbody').find("tr[data-id=#{item.id}][data-kind=#{item.kind}]")
 
     if existsItem.length
       existsItem.html template.html()
@@ -22,12 +22,13 @@
 
   @removeItem = (id) ->
     item = @select('tbody').find("tr[data-id=#{id}]")
-    item.hide 'slow', -> item.remove()
-    @checkEmpty()
+    item.hide 'slow', =>
+      item.remove()
+      @checkEmpty()
 
-  @populate = (data) ->
-    if not _.isEmpty(data)
-      @addOrUpdateItem item for item in data
+  @populate = (event, data) ->
+    if not _.isEmpty(data.orders)
+      @addOrUpdateItem item for item in data.orders
 
     @checkEmpty()
 

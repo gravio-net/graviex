@@ -8,11 +8,14 @@ class PaymentTransaction < ActiveRecord::Base
   STATE = [:unconfirm, :confirming, :confirmed]
   enumerize :aasm_state, in: STATE, scope: true
 
-  validates_uniqueness_of :txid
-  belongs_to :deposit, foreign_key: 'txid', primary_key: 'txid'
+  validates_presence_of :txid
+
+  has_one :deposit
   belongs_to :payment_address, foreign_key: 'address', primary_key: 'address'
   has_one :account, through: :payment_address
   has_one :member, through: :account
+
+  after_update :sync_update
 
   aasm :whiny_transitions => false do
     state :unconfirm, initial: true
@@ -44,6 +47,14 @@ class PaymentTransaction < ActiveRecord::Base
   def deposit_accept
     if deposit.may_accept?
       deposit.accept! 
+    end
+  end
+
+  private
+
+  def sync_update
+    if self.confirmations_changed?
+      ::Pusher["private-#{deposit.member.sn}"].trigger_async('deposits', { type: 'update', id: self.deposit.id, attributes: {confirmations: self.confirmations}})
     end
   end
 end

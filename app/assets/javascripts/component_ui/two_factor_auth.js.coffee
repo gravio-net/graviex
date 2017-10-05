@@ -1,5 +1,5 @@
 @TwoFactorAuth = flight.component ->
-  @defaultAttrs
+  @attributes
     switchName: 'span.switch-name'
     switchItem: '.dropdown-menu a'
     switchItemApp: '.dropdown-menu a[data-type="app"]'
@@ -9,6 +9,7 @@
     authType: '.two_factor_auth_type'
     appHint: 'span.hint.app'
     smsHint: 'span.hint.sms'
+    chapterWrap: '.captcha-wrap'
 
   @setActiveItem = (event) ->
     switch $(event.target).data('type')
@@ -21,7 +22,6 @@
     @select('authType').val('app')
     @select('smsHint').addClass('hide')
     @select('appHint').removeClass('hide')
-    @rememberLastSelecct('app')
 
   @switchToSms = ->
     @select('switchName').text @select('switchItemSms').text()
@@ -29,7 +29,6 @@
     @select('authType').val('sms')
     @select('smsHint').removeClass('hide')
     @select('appHint').addClass('hide')
-    @rememberLastSelecct('sms')
 
   @countDownSendCodeButton = ->
     origName  = @select('sendCodeButton').data('orig-name')
@@ -52,21 +51,14 @@
     event.preventDefault()
 
     @countDownSendCodeButton()
-    $.get('/refresh_two_factors/sms')
+    $.get('/two_factors/sms?refresh=true')
 
-  @rememberLastSelecct = (type) ->
-    if localStorage
-      localStorage["two_factor_auth_type"] = ['app', 'sms'].indexOf(type)
-
-  @resumeLastSelect = (type) ->
-    if localStorage
-      index = parseInt(localStorage["two_factor_auth_type"] || '0')
-      switch index
-        when 0 then @switchToApp()
-        when 1 then @switchToSms()
+  @checkCaptchaRequired = ->
+    @select('chapterWrap').load '/two_factors/app', (html) -> $(@).html(html)
 
   @after 'initialize', ->
+    @checkCaptchaRequired()
+    $.subscribe 'withdraw:form:submitted', => @checkCaptchaRequired()
     @on @select('switchItem'), 'click', @setActiveItem
     @on @select('sendCodeButton'), 'click', @sendCode
-    @resumeLastSelect()
 

@@ -1,5 +1,5 @@
 .row
-  .col-md-8
+  .col-xs-12
     .panel.panel-primary
       .panel-heading
         span = t('.withdraw', sn: @satoshi.id)
@@ -18,11 +18,13 @@
           = item_for @satoshi, :remark
           hr.split
           ul.list-inline.pull-right
-            - if @satoshi.may_process?
+            - if @satoshi.may_reject?
               li
                 = link_to t('.reject'), url_for([:admin, @satoshi]), class: 'btn btn-danger', method: 'DELETE', confirm: t('.reject_confirm')
             - if @satoshi.may_process?
               li
                 = link_to t('.process'), url_for([:admin, @satoshi]), class: 'btn btn-primary', method: 'PATCH'
-  .col-md-8
-    = render partial: 'shared/admin/member', locals: {member: @satoshi.member} 
+
+  .col-xs-12
+    = render partial: 'shared/admin/member', locals: {member: @satoshi.member}
+    = render partial: 'shared/admin/account', locals: {account: @satoshi.account}
