@@ -65,7 +65,7 @@ app.controller 'WithdrawsController', ['$scope', '$stateParams', '$http', '$gon'
         $.publish 'withdraw:form:submitted'
 
   @withdrawAll = ->
-    @withdraw.sum = Number($scope.account.balance)
+    @withdraw.sum = Number(Math.round($scope.account.balance+'e8')+'e-8')
 
   $scope.openFundSourceManagerPanel = ->
     if $scope.currency == $gon.fiat_currency
