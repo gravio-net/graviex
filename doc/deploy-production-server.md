@@ -3,7 +3,7 @@ Deploy production server on Ubuntu 14.04 / 16
 
 ### Overview
 
-1. Setup deploy user
+1. Setup graviex user
 2. Install [Ruby](https://www.ruby-lang.org/en/)
 3. Install [MySQL](http://www.mysql.com/)
 4. Install [Redis](http://redis.io/)
@@ -14,14 +14,14 @@ Deploy production server on Ubuntu 14.04 / 16
 9. Install ImageMagick
 10. Configure Peatio
 
-### 1. Setup deploy user
+### 1. Setup graviex user
 
-Create (if it doesn’t exist) deploy user, and assign it to the sudo group:
+Create (if it doesn’t exist) graviex user, and assign it to the sudo group:
 
     sudo adduser graviex
     sudo usermod -a -G sudo graviex
 
-Re-login as deploy user
+Re-login as graviex user
 
 ### 2. Install Ruby
 
@@ -86,7 +86,7 @@ Please follow instructions here: https://www.rabbitmq.com/install-debian.html
     sudo mv rabbitmqadmin /usr/local/sbin
     
     rabbitmqctl add_user graviex *****
-    rabbitmqctl set_user_tags deploy administrator
+    rabbitmqctl set_user_tags graviex administrator
     rabbitmqctl set_permissions -p / graviex ".*" ".*" ".*"
 
 ### 6. Install Bitcoind
@@ -168,7 +168,7 @@ find the following lines, and uncomment them:
 
 update the second line to read:
 
-    passenger_ruby /home/deploy/.rbenv/shims/ruby;
+    passenger_ruby /home/graviex/.rbenv/shims/ruby;
 
 ### 8. Install JavaScript Runtime
 
