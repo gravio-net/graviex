@@ -18,8 +18,8 @@ Deploy production server on Ubuntu 14.04 / 16
 
 Create (if it doesn’t exist) deploy user, and assign it to the sudo group:
 
-    sudo adduser deploy
-    sudo usermod -a -G sudo deploy
+    sudo adduser graviex
+    sudo usermod -a -G sudo graviex
 
 Re-login as deploy user
 
@@ -85,9 +85,9 @@ Please follow instructions here: https://www.rabbitmq.com/install-debian.html
     chmod +x rabbitmqadmin
     sudo mv rabbitmqadmin /usr/local/sbin
     
-    rabbitmqctl add_user deploy *****
+    rabbitmqctl add_user graviex *****
     rabbitmqctl set_user_tags deploy administrator
-    rabbitmqctl set_permissions -p / deploy ".*" ".*" ".*"
+    rabbitmqctl set_permissions -p / graviex ".*" ".*" ".*"
 
 ### 6. Install Bitcoind
 
@@ -190,9 +190,8 @@ A JavaScript Runtime is needed for Asset Pipeline to work. Any runtime will do b
 
 ##### Clone the Source
 
-    mkdir -p ~/peatio
-    git clone git://github.com/peatio/peatio.git ~/peatio/current
-    cd peatio/current
+    git clone git://github.com/peatio/peatio.git ~/graviex-exchange
+    cd graviex-exchange
 
     ＃ Install dependency gems
     bundle install --without development test --path vendor/bundle
@@ -265,7 +264,7 @@ For security reason, you must setup SSL Certificate for production environment, 
 **Passenger:**
 
     sudo rm /etc/nginx/sites-enabled/default
-    sudo ln -s /home/deploy/peatio/current/config/nginx.conf /etc/nginx/conf.d/peatio.conf
+    sudo ln -s /home/graviex/graviex-exchange/config/nginx.conf /etc/nginx/conf.d/peatio.conf
     sudo service nginx restart
 
 **Liability Proof**
