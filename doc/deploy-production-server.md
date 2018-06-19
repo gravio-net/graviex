@@ -190,7 +190,7 @@ A JavaScript Runtime is needed for Asset Pipeline to work. Any runtime will do b
 
 ##### Clone the Source
 
-    git clone git://github.com/peatio/peatio.git ~/graviex-exchange
+    git clone git://github.com/gravio-net/graviex.git ~/graviex-exchange
     cd graviex-exchange
 
     ＃ Install dependency gems
