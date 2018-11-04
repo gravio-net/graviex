@@ -1,5 +1,9 @@
 GRAVIEX Exchange - cryptocurrency exchange
 ==========================================
+### Notice
+This PUBLIC version of GRAVIEX Exchange is outdated and not supported by GRAVIEX Team since Apr 22, 2018. 
+You can use it on your own risk.
+
 ### Features
 
 * Designed as high performance crypto currency exchange.
